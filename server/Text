@@ -1,0 +1,20 @@
+Run - cd server
+npm run dev
+
+
+Run - cd client
+npm run dev
+
+ "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ZTRiYmNjZjFjMjk3NDkyNmRkMmI0MiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc3NjY2MjgyNiwiZXhwIjoxNzc3MjY3NjI2fQ.Urgw00gxjFrc6qyE7nDZhITtzCgt-oMi1JdgL2B0yMI"
+
+
+ {
+  "_id": "69e5bba190e866d667c7ecd7",
+  "name": "Test Citizen",
+  "email": "citizen@smartbin.com",
+  "role": "citizen",
+  "greenPoints": 0,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ZTViYmExOTBlODY2ZDY2N2M3ZWNkNyIsInJvbGUiOiJjaXRpemVuIiwiaWF0IjoxNzc2NjYzNDU3LCJleHAiOjE3NzcyNjgyNTd9.Ep29Gd4_o7TXDMvewgesuQLuvfh-R5Wqy1OAzEgQJ4U"
+}
+
+
