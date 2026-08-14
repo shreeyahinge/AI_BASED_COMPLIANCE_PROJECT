@@ -160,6 +160,25 @@ const deleteBin = async (req, res) => {
   }
 };
 
+
+const { predictOverflow } = require("../services/predictionService");
+
+// @route  GET /api/bins/:id/predict
+// @access Admin
+const predictBinOverflow = async (req, res) => {
+  try {
+    const bin = await Bin.findById(req.params.id);
+    if (!bin) {
+      return res.status(404).json({ message: "Bin not found" });
+    }
+    const prediction = await predictOverflow(req.params.id);
+    res.json({ bin: bin.binId, location: bin.location.address, ...prediction });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
 module.exports = {
   createBin,
   getAllBins,
@@ -167,4 +186,5 @@ module.exports = {
   getBinById,
   updateBin,
   deleteBin,
+  predictBinOverflow,
 };

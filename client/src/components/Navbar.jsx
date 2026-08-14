@@ -13,9 +13,9 @@ export default function Navbar() {
   };
 
   const roleColor = {
-    admin: "#00b4d8",
-    officer: "#06d6a0",
-    citizen: "#ffb703",
+    admin: "#3b82f6",
+    officer: "#10b981",
+    citizen: "#f59e0b",
   };
 
   return (
@@ -54,11 +54,12 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     padding: "14px 24px",
-    background: "#152539",
-    borderBottom: "1px solid #1e3a55",
+    background: "#ffffff",
+    borderBottom: "1px solid #e5e7eb",
     position: "sticky",
     top: 0,
     zIndex: 100,
+    boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
   },
   left: {
     display: "flex",
@@ -69,15 +70,15 @@ const styles = {
   brand: {
     fontSize: "20px",
     fontWeight: "700",
-    color: "#00b4d8",
+    color: "#166534",
   },
   cityTag: {
     fontSize: "12px",
-    color: "#8ecae6",
-    background: "#0d1b2a",
+    color: "#6b7280",
+    background: "#f9fafb",
     padding: "3px 10px",
     borderRadius: "20px",
-    border: "1px solid #1e3a55",
+    border: "1px solid #d1d5db",
   },
   right: {
     display: "flex",
@@ -86,7 +87,7 @@ const styles = {
   },
   name: {
     fontSize: "14px",
-    color: "#ffffff",
+    color: "#111827",
     fontWeight: "500",
   },
   role: {
@@ -99,16 +100,17 @@ const styles = {
   },
   points: {
     fontSize: "13px",
-    color: "#ffb703",
+    color: "#f59e0b",
     fontWeight: "600",
   },
   logoutBtn: {
     padding: "7px 16px",
-    background: "transparent",
-    border: "1px solid #1e3a55",
+    background: "#ffffff",
+    border: "1px solid #d1d5db",
     borderRadius: "8px",
-    color: "#8ecae6",
+    color: "#4b5563",
     fontSize: "13px",
     cursor: "pointer",
+    boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
   },
 };

@@ -19,12 +19,17 @@ export const SocketProvider = ({ children }) => {
     if (user.role === "admin") {
       newSocket.emit("join_admin");
     } else if (user.role === "officer") {
-      newSocket.emit("join_officer", user.assignedWard || "general");
+      newSocket.emit("join_officer", user.city || "general");
     }
 
     // Listen for critical reports (admin)
     newSocket.on("new_critical_report", (data) => {
       toast.error(`🚨 ${data.message}`, { duration: 6000 });
+    });
+
+    // Listen for task completion (admin)
+    newSocket.on("task_completed", (data) => {
+      toast.success(`✅ ${data.message}`, { duration: 5000 });
     });
 
     // Listen for new tasks (officer)

@@ -2,9 +2,9 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 const statusColor = {
-  clean: "#06d6a0",
-  medium: "#ffb703",
-  critical: "#ef476f",
+  clean: "#10b981",
+  medium: "#f59e0b",
+  critical: "#ef4444",
 };
 
 export default function BinMap({ bins }) {
@@ -24,8 +24,8 @@ export default function BinMap({ bins }) {
         scrollWheelZoom={true}
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
         {bins.map((bin) => (
           <CircleMarker
@@ -34,15 +34,16 @@ export default function BinMap({ bins }) {
               bin.location.coordinates[1],
               bin.location.coordinates[0],
             ]}
-            radius={bin.fillLevel ? Math.max(8, bin.fillLevel / 8) : 8}
-            fillColor={statusColor[bin.status] || "#8ecae6"}
-            color={statusColor[bin.status] || "#8ecae6"}
-            fillOpacity={0.7}
-            weight={2}
+            radius={bin.fillLevel ? Math.max(12, bin.fillLevel / 4) : 12}
+            fillColor={statusColor[bin.status] || "#6b7280"}
+            color={statusColor[bin.status] || "#6b7280"}
+            fillOpacity={0.8}
+            weight={1}
+            className={`glow-marker-${bin.status}`}
           >
             <Popup>
               <div style={styles.popup}>
-                <strong style={{ color: "#0d1b2a" }}>{bin.binId}</strong>
+                <strong style={{ color: "#111827" }}>{bin.binId}</strong>
                 <p>{bin.location.address}</p>
                 <p>{bin.area}, {bin.ward}</p>
                 <p>Fill: <strong>{bin.fillLevel}%</strong></p>
@@ -75,7 +76,7 @@ const styles = {
     position: "relative",
     borderRadius: "12px",
     overflow: "hidden",
-    border: "1px solid #1e3a55",
+    border: "1px solid #e5e7eb",
   },
   map: {
     height: "380px",
@@ -90,12 +91,13 @@ const styles = {
     bottom: "12px",
     left: "12px",
     zIndex: 999,
-    background: "rgba(21,37,57,0.95)",
-    border: "1px solid #1e3a55",
+    background: "rgba(255, 255, 255, 0.95)",
+    border: "1px solid #e5e7eb",
     borderRadius: "8px",
     padding: "8px 12px",
     display: "flex",
     gap: "12px",
+    boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
   },
   legendItem: {
     display: "flex",
@@ -109,7 +111,8 @@ const styles = {
   },
   legendText: {
     fontSize: "11px",
-    color: "#8ecae6",
+    color: "#4b5563",
     textTransform: "capitalize",
+    fontWeight: "500",
   },
 };

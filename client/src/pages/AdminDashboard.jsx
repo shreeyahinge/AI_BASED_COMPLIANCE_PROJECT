@@ -8,6 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
+import { useSocket } from "../context/SocketContext";
 
 export default function AdminDashboard() {
   const [bins, setBins] = useState([]);
@@ -20,9 +21,51 @@ export default function AdminDashboard() {
     city: "", ward: "", area: "", locationType: "street", capacity: 100,
   });
 
+  const [predictions, setPredictions] = useState([]);
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
+
+  const fetchPredictions = async () => {
+    setLoadingPredictions(true);
+    try {
+      const criticalBins = bins.filter(
+        (b) => b.status === "critical" || b.status === "medium"
+      );
+      const predResults = await Promise.all(
+        criticalBins.slice(0, 5).map(async (bin) => {
+          try {
+            const { data } = await API.get(`/bins/${bin._id}/predict`);
+            return { ...data, binData: bin };
+          } catch {
+            return null;
+          }
+        })
+      );
+      setPredictions(predResults.filter(Boolean));
+    } catch (error) {
+      toast.error("Could not load predictions");
+    } finally {
+      setLoadingPredictions(false);
+    }
+  };
+
+  const { socket } = useSocket();
+
   useEffect(() => {
     fetchAll();
+    fetchPredictions();
   }, []);
+
+  useEffect(() => {
+    if (socket) {
+      const handleUpdate = () => fetchAll();
+      socket.on("new_critical_report", handleUpdate);
+      socket.on("task_completed", handleUpdate);
+      return () => {
+        socket.off("new_critical_report", handleUpdate);
+        socket.off("task_completed", handleUpdate);
+      };
+    }
+  }, [socket]);
 
   const fetchAll = async () => {
     try {
@@ -61,12 +104,32 @@ export default function AdminDashboard() {
     }
   };
 
+
+// @route  GET /api/analytics/export-pdf
+const handleExportPDF = async () => {
+  try {
+    const response = await API.get("/analytics/export-pdf", {
+      responseType: "blob",
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `SmartBin-Report-${Date.now()}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    toast.success("PDF report downloaded!");
+  } catch (error) {
+    toast.error("Failed to export PDF");
+  }
+};
+
   // Chart data — reports by priority
   const chartData = [
-    { name: "Critical", count: reports.filter(r => r.priority === "critical").length, color: "#ef476f" },
-    { name: "High", count: reports.filter(r => r.priority === "high").length, color: "#ffb703" },
-    { name: "Medium", count: reports.filter(r => r.priority === "medium").length, color: "#00b4d8" },
-    { name: "Low", count: reports.filter(r => r.priority === "low").length, color: "#06d6a0" },
+    { name: "Critical", count: reports.filter(r => r.priority === "critical").length, color: "#ef4444" },
+    { name: "High", count: reports.filter(r => r.priority === "high").length, color: "#f59e0b" },
+    { name: "Medium", count: reports.filter(r => r.priority === "medium").length, color: "#3b82f6" },
+    { name: "Low", count: reports.filter(r => r.priority === "low").length, color: "#10b981" },
   ];
 
   if (loading) return (
@@ -80,16 +143,16 @@ export default function AdminDashboard() {
 
         {/* Stats Row */}
         <div style={styles.statsRow}>
-          <StatsCard title="Total Bins" value={stats.total} color="#00b4d8" icon="🗑️" />
-          <StatsCard title="Critical" value={stats.critical} color="#ef476f" icon="🚨" />
-          <StatsCard title="Medium" value={stats.medium} color="#ffb703" icon="⚠️" />
-          <StatsCard title="Clean" value={stats.clean} color="#06d6a0" icon="✅" />
-          <StatsCard title="Reports" value={reports.length} color="#8ecae6" icon="📋" />
+          <StatsCard title="Total Bins" value={stats.total} color="#1e40af" icon="🗑️" />
+          <StatsCard title="Critical" value={stats.critical} color="#ef4444" icon="🚨" />
+          <StatsCard title="Medium" value={stats.medium} color="#f59e0b" icon="⚠️" />
+          <StatsCard title="Clean" value={stats.clean} color="#10b981" icon="✅" />
+          <StatsCard title="Reports" value={reports.length} color="#6b7280" icon="📋" />
         </div>
 
         {/* Tabs */}
         <div style={styles.tabs}>
-          {["overview", "bins", "reports", "add bin"].map((tab) => (
+          {["overview", "bins", "reports", "predictions", "add bin"].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -100,7 +163,12 @@ export default function AdminDashboard() {
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
+            
           ))}
+          <button onClick={handleExportPDF} style={styles.pdfBtn}>
+  📄 Export PDF Report
+</button>
+
         </div>
 
         {/* Overview Tab */}
@@ -119,15 +187,15 @@ export default function AdminDashboard() {
               <div style={{ height: "380px" }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e3a55" />
-                    <XAxis dataKey="name" stroke="#8ecae6" fontSize={12} />
-                    <YAxis stroke="#8ecae6" fontSize={12} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="name" stroke="#6b7280" fontSize={12} />
+                    <YAxis stroke="#6b7280" fontSize={12} />
                     <Tooltip
                       contentStyle={{
-                        background: "#152539",
-                        border: "1px solid #1e3a55",
+                        background: "#ffffff",
+                        border: "1px solid #e5e7eb",
                         borderRadius: "8px",
-                        color: "#fff",
+                        color: "#1f2937",
                       }}
                     />
                     <Bar dataKey="count" radius={[6, 6, 0, 0]}>
@@ -168,8 +236,8 @@ export default function AdminDashboard() {
                           <div style={{
                             ...styles.fillFill,
                             width: `${bin.fillLevel}%`,
-                            background: bin.fillLevel >= 85 ? "#ef476f"
-                              : bin.fillLevel >= 50 ? "#ffb703" : "#06d6a0",
+                            background: bin.fillLevel >= 85 ? "#ef4444"
+                              : bin.fillLevel >= 50 ? "#f59e0b" : "#10b981",
                           }} />
                           <span style={styles.fillText}>{bin.fillLevel}%</span>
                         </div>
@@ -177,10 +245,10 @@ export default function AdminDashboard() {
                       <td style={styles.td}>
                         <span style={{
                           ...styles.statusBadge,
-                          background: bin.status === "critical" ? "#ef476f22"
-                            : bin.status === "medium" ? "#ffb70322" : "#06d6a022",
-                          color: bin.status === "critical" ? "#ef476f"
-                            : bin.status === "medium" ? "#ffb703" : "#06d6a0",
+                          background: bin.status === "critical" ? "#ef444422"
+                            : bin.status === "medium" ? "#f59e0b22" : "#10b98122",
+                          color: bin.status === "critical" ? "#ef4444"
+                            : bin.status === "medium" ? "#d97706" : "#059669",
                         }}>
                           {bin.status}
                         </span>
@@ -217,10 +285,10 @@ export default function AdminDashboard() {
                       <td style={styles.td}>
                         <span style={{
                           ...styles.statusBadge,
-                          background: r.priority === "critical" ? "#ef476f22"
-                            : r.priority === "high" ? "#ffb70322" : "#00b4d822",
-                          color: r.priority === "critical" ? "#ef476f"
-                            : r.priority === "high" ? "#ffb703" : "#00b4d8",
+                          background: r.priority === "critical" ? "#ef444422"
+                            : r.priority === "high" ? "#f59e0b22" : "#3b82f622",
+                          color: r.priority === "critical" ? "#ef4444"
+                            : r.priority === "high" ? "#d97706" : "#2563eb",
                         }}>
                           {r.priority}
                         </span>
@@ -234,6 +302,69 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Predictions Tab */}
+        {activeTab === "predictions" && (
+          <div style={styles.section}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h2 style={styles.sectionTitle}>🔮 Overflow Predictions</h2>
+              <button onClick={fetchPredictions} style={styles.submitBtn}>
+                {loadingPredictions ? "Analysing..." : "Run Predictions"}
+              </button>
+            </div>
+            {predictions.length === 0 ? (
+              <div style={styles.empty}>
+                Click "Run Predictions" to analyse at-risk bins
+              </div>
+            ) : (
+              predictions.map((p, i) => (
+                <div key={i} style={{
+                  background: "#ffffff", border: "1px solid",
+                  borderColor: p.urgency === "critical" ? "#ef444444"
+                    : p.urgency === "high" ? "#f59e0b44" : "#e5e7eb",
+                  borderRadius: "10px", padding: "16px", marginBottom: "10px",
+                  boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <p style={{ fontWeight: "600", color: "#111827", fontSize: "14px", marginBottom: "4px" }}>
+                        {p.bin} — {p.location}
+                      </p>
+                      <p style={{ fontSize: "13px", color: "#4b5563" }}>
+                        {p.prediction}
+                      </p>
+                    </div>
+                    {p.urgency && (
+                      <span style={{
+                        padding: "4px 12px", borderRadius: "20px", fontSize: "11px",
+                        fontWeight: "700",
+                        background: p.urgency === "critical" ? "#ef444422"
+                          : p.urgency === "high" ? "#f59e0b22" : "#3b82f622",
+                        color: p.urgency === "critical" ? "#ef4444"
+                          : p.urgency === "high" ? "#d97706" : "#2563eb",
+                      }}>
+                        {p.urgency?.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  {p.hoursToOverflow !== null && p.hoursToOverflow !== undefined && (
+                    <div style={{ display: "flex", gap: "20px", marginTop: "10px", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                        ⏱️ ~{p.hoursToOverflow} hours to overflow
+                      </span>
+                      <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                        📈 Fill rate: {p.currentFillRate}%/hr
+                      </span>
+                      <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                        📊 Based on {p.dataPoints} data points
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         )}
 
@@ -286,41 +417,47 @@ export default function AdminDashboard() {
 }
 
 const styles = {
-  page: { minHeight: "100vh", background: "#0d1b2a" },
+  pdfBtn: {
+    padding: "10px 18px", background: "#ffffff",
+    border: "1px solid #d1d5db", borderRadius: "8px",
+    color: "#166534", fontSize: "13px", cursor: "pointer",
+    fontWeight: "500", boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+  },
+  page: { minHeight: "100vh", background: "#f4f6f9" },
   container: { padding: "24px", maxWidth: "1400px", margin: "0 auto" },
   loading: { display: "flex", alignItems: "center", justifyContent: "center",
-    height: "100vh", color: "#00b4d8", fontSize: "18px" },
+    height: "100vh", color: "#166534", fontSize: "18px" },
   statsRow: { display: "flex", gap: "16px", marginBottom: "24px", flexWrap: "wrap" },
   tabs: { display: "flex", gap: "8px", marginBottom: "24px", flexWrap: "wrap" },
-  tab: { padding: "10px 20px", background: "#152539", border: "1px solid #1e3a55",
-    borderRadius: "8px", color: "#8ecae6", fontSize: "14px", cursor: "pointer" },
-  tabActive: { background: "#00b4d8", color: "#0d1b2a", border: "1px solid #00b4d8",
+  tab: { padding: "10px 20px", background: "#ffffff", border: "1px solid #e5e7eb",
+    borderRadius: "8px", color: "#4b5563", fontSize: "14px", cursor: "pointer", boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)" },
+  tabActive: { background: "#166534", color: "#ffffff", border: "1px solid #166534",
     fontWeight: "600" },
   grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" },
-  section: { background: "#152539", border: "1px solid #1e3a55",
-    borderRadius: "12px", padding: "20px", marginBottom: "24px" },
-  sectionTitle: { fontSize: "16px", fontWeight: "600", color: "#ffffff",
+  section: { background: "#ffffff", border: "1px solid #e5e7eb",
+    borderRadius: "12px", padding: "20px", marginBottom: "24px", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)" },
+  sectionTitle: { fontSize: "16px", fontWeight: "600", color: "#111827",
     marginBottom: "16px" },
-  empty: { color: "#8ecae6", textAlign: "center", padding: "40px" },
+  empty: { color: "#6b7280", textAlign: "center", padding: "40px" },
   tableWrapper: { overflowX: "auto" },
   table: { width: "100%", borderCollapse: "collapse" },
-  th: { padding: "12px", textAlign: "left", fontSize: "12px", color: "#8ecae6",
-    borderBottom: "1px solid #1e3a55", whiteSpace: "nowrap" },
-  tr: { borderBottom: "1px solid #1e3a5533" },
-  td: { padding: "12px", fontSize: "13px", color: "#ffffff" },
-  fillBar: { position: "relative", background: "#0d1b2a", borderRadius: "4px",
+  th: { padding: "12px", textAlign: "left", fontSize: "12px", color: "#6b7280",
+    borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" },
+  tr: { borderBottom: "1px solid #e5e7eb" },
+  td: { padding: "12px", fontSize: "13px", color: "#1f2937" },
+  fillBar: { position: "relative", background: "#e5e7eb", borderRadius: "4px",
     height: "20px", width: "80px", overflow: "hidden" },
   fillFill: { position: "absolute", top: 0, left: 0, height: "100%",
     borderRadius: "4px", transition: "width 0.3s" },
   fillText: { position: "absolute", top: 0, left: 0, right: 0,
-    textAlign: "center", fontSize: "11px", lineHeight: "20px", color: "#fff" },
+    textAlign: "center", fontSize: "11px", lineHeight: "20px", color: "#ffffff", textShadow: "0 0 2px rgba(0,0,0,0.5)" },
   statusBadge: { padding: "3px 10px", borderRadius: "20px",
     fontSize: "11px", fontWeight: "600", textTransform: "capitalize" },
   addForm: { display: "flex", flexDirection: "column", gap: "16px" },
   formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" },
-  formInput: { padding: "12px 14px", background: "#0d1b2a",
-    border: "1px solid #1e3a55", borderRadius: "8px", color: "#ffffff", fontSize: "14px" },
-  submitBtn: { padding: "13px", background: "#00b4d8", color: "#0d1b2a",
+  formInput: { padding: "12px 14px", background: "#f9fafb",
+    border: "1px solid #d1d5db", borderRadius: "8px", color: "#1f2937", fontSize: "14px", transition: "border-color 0.2s" },
+  submitBtn: { padding: "13px", background: "#166534", color: "#ffffff",
     border: "none", borderRadius: "8px", fontSize: "15px",
-    fontWeight: "600", cursor: "pointer", width: "fit-content" },
+    fontWeight: "600", cursor: "pointer", width: "fit-content", boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)" },
 };

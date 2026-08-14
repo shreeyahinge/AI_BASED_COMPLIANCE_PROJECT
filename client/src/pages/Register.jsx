@@ -82,6 +82,10 @@ export default function Register() {
             <option value="admin">Admin</option>
           </select>
 
+
+          {/* Ward is removed, using city for assignment */}
+
+
           <button
             type="submit"
             style={loading ? { ...styles.button, opacity: 0.7 } : styles.button}
@@ -108,40 +112,43 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#0d1b2a",
+    background: "#f4f6f9",
   },
   card: {
-    background: "#152539",
-    border: "1px solid #1e3a55",
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
     borderRadius: "16px",
     padding: "40px",
     width: "100%",
     maxWidth: "420px",
     textAlign: "center",
+    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
   },
   logo: { fontSize: "48px", marginBottom: "12px" },
-  title: { fontSize: "28px", fontWeight: "700", color: "#00b4d8", marginBottom: "6px" },
-  subtitle: { fontSize: "14px", color: "#8ecae6", marginBottom: "32px" },
+  title: { fontSize: "28px", fontWeight: "700", color: "#166534", marginBottom: "6px" },
+  subtitle: { fontSize: "14px", color: "#6b7280", marginBottom: "32px" },
   form: { display: "flex", flexDirection: "column", gap: "14px" },
   input: {
     width: "100%",
     padding: "12px 14px",
-    background: "#0d1b2a",
-    border: "1px solid #1e3a55",
+    background: "#f9fafb",
+    border: "1px solid #d1d5db",
     borderRadius: "8px",
-    color: "#ffffff",
+    color: "#1f2937",
     fontSize: "14px",
+    transition: "border-color 0.2s",
   },
   button: {
     padding: "13px",
-    background: "#00b4d8",
-    color: "#0d1b2a",
+    background: "#166534",
+    color: "#ffffff",
     border: "none",
     borderRadius: "8px",
     fontSize: "15px",
     fontWeight: "600",
     marginTop: "4px",
+    boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
   },
-  loginText: { marginTop: "24px", fontSize: "13px", color: "#8ecae6" },
-  link: { color: "#00b4d8", cursor: "pointer", fontWeight: "600" },
+  loginText: { marginTop: "24px", fontSize: "13px", color: "#4b5563" },
+  link: { color: "#166534", cursor: "pointer", fontWeight: "600" },
 };

@@ -18,45 +18,44 @@ const io = new Server(server, {
   },
 });
 
-// Make io accessible in routes
 app.set("io", io);
 
 app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 app.use(express.json());
 
-// Routes
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/bins", require("./routes/bins"));
-app.use("/api/reports", require("./routes/reports"));
-app.use("/api/tasks", require("./routes/tasks"));
-app.use("/api/upload", require("./routes/upload"));
+// All routes
+app.use("/api/auth",      require("./routes/auth"));
+app.use("/api/bins",      require("./routes/bins"));
+app.use("/api/reports",   require("./routes/reports"));
+app.use("/api/tasks",     require("./routes/tasks"));
+app.use("/api/upload",    require("./routes/upload"));
 app.use("/api/analytics", require("./routes/analytics"));
 
-// Health check
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "SmartBin City running!", version: "1.0.0" });
+  res.json({
+    status: "ok",
+    message: "SmartBin City running!",
+    version: "2.0.0",
+    features: [
+      "Gemini AI detection",
+      "Real-time Socket.io",
+      "Cloudinary upload",
+      "Overflow prediction",
+      "Route optimisation",
+      "PDF export",
+      "Green Points leaderboard",
+    ],
+  });
 });
 
-// Socket.io connection
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
-
-  socket.on("join_admin", () => {
-    socket.join("admin_room");
-    console.log("Admin joined room");
-  });
-
-  socket.on("join_officer", (ward) => {
-    socket.join(`ward_${ward}`);
-    console.log(`Officer joined ward: ${ward}`);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
-  });
+  socket.on("join_admin",   () => socket.join("admin_room"));
+  socket.on("join_officer", (city) => socket.join(`city_${city}`));
+  socket.on("disconnect",   () => console.log("Disconnected:", socket.id));
 });
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`SmartBin server v2.0 running on port ${PORT}`);
 });

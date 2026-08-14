@@ -2,8 +2,8 @@ const Report = require("../models/Report");
 const Bin = require("../models/Bin");
 const User = require("../models/User");
 const Task = require("../models/Task");
+const { analyseWasteImage } = require("../services/aiService");
 
-// Helper — map AI score to priority
 const getPriority = (score) => {
   if (score >= 85) return "critical";
   if (score >= 60) return "high";
@@ -13,45 +13,72 @@ const getPriority = (score) => {
 };
 
 // @route  POST /api/reports
-// @access Citizen / Officer
 const createReport = async (req, res) => {
   try {
-    const {
-      binId,
-      photoUrl,
-      aiScore,
-      aiLabels,
-      fillLevel,
-      latitude,
-      longitude,
-      notes,
-    } = req.body;
+    const { binId, photoUrl, fillLevel, latitude, longitude, notes } = req.body;
 
-    // Check bin exists
     const bin = await Bin.findById(binId);
     if (!bin) {
       return res.status(404).json({ message: "Bin not found" });
     }
 
-    const priority = getPriority(aiScore || 0);
+    // Run Gemini AI analysis
+    let aiResult = {
+      isWaste: true,
+      aiScore: 70,
+      fillLevel: fillLevel || 70,
+      labels: [],
+      wasteLabels: [],
+      wasteType: "unknown",
+    };
 
-    // Reject spam reports
-    if (priority === "rejected") {
-      return res.status(400).json({
-        message: "Report rejected — AI could not detect waste in this photo",
-        aiScore,
+    if (photoUrl) {
+      console.log("Running Gemini AI analysis...");
+      aiResult = await analyseWasteImage(photoUrl);
+      console.log("AI Result:", aiResult);
+    }
+
+    // Reject spam
+    if (!aiResult.isWaste || aiResult.aiScore < 20) {
+      const report = await Report.create({
+        citizen: req.user._id,
+        bin: binId,
+        photoUrl: photoUrl || "",
+        aiScore: aiResult.aiScore,
+        aiLabels: aiResult.wasteLabels,
+        fillLevel: 0,
+        priority: "rejected",
+        status: "rejected",
+        location: { latitude, longitude },
+        city: bin.city,
+        ward: bin.ward,
+        area: bin.area,
+        notes: "Auto-rejected: AI could not detect waste in this photo.",
+      });
+
+      return res.status(200).json({
+        message: "Report auto-rejected — AI could not detect waste in this photo",
+        report,
+        aiAnalysis: {
+          wasteType: aiResult.wasteType,
+          reasoning: aiResult.reasoning,
+          detectedLabels: aiResult.wasteLabels,
+        },
       });
     }
 
-    // Create report
+    const finalFillLevel = aiResult.fillLevel || fillLevel || 0;
+    const priority = getPriority(aiResult.aiScore);
+
     const report = await Report.create({
       citizen: req.user._id,
       bin: binId,
-      photoUrl,
-      aiScore: aiScore || 0,
-      aiLabels: aiLabels || [],
-      fillLevel: fillLevel || 0,
+      photoUrl: photoUrl || "",
+      aiScore: aiResult.aiScore,
+      aiLabels: aiResult.wasteLabels,
+      fillLevel: finalFillLevel,
       priority,
+      status: "pending",
       location: { latitude, longitude },
       city: bin.city,
       ward: bin.ward,
@@ -59,25 +86,24 @@ const createReport = async (req, res) => {
       notes,
     });
 
-    // Update bin fill level and status automatically
-    bin.fillLevel = fillLevel || bin.fillLevel;
+    // Update bin
+    bin.fillLevel = finalFillLevel;
     bin.lastUpdated = Date.now();
-    if (fillLevel >= 85) bin.status = "critical";
-    else if (fillLevel >= 50) bin.status = "medium";
+    if (finalFillLevel >= 85) bin.status = "critical";
+    else if (finalFillLevel >= 50) bin.status = "medium";
     else bin.status = "clean";
     await bin.save();
 
-    // Award green points to citizen
+    // Award Green Points
     await User.findByIdAndUpdate(req.user._id, {
       $inc: { greenPoints: 10 },
     });
 
-    // Auto-create task if priority is high or critical
+    // Auto-create task for high/critical
     if (priority === "high" || priority === "critical") {
-      // Find available officer in same ward
       const officer = await User.findOne({
         role: "officer",
-        assignedWard: bin.ward,
+        city: new RegExp(`^${bin.city}$`, "i"),
         isActive: true,
       });
 
@@ -95,7 +121,7 @@ const createReport = async (req, res) => {
         report.status = "assigned";
         await report.save();
 
-        // Emit real-time alert to admin room
+        // Socket.io alerts
         const io = req.app.get("io");
         if (io) {
           io.to("admin_room").emit("new_critical_report", {
@@ -105,17 +131,13 @@ const createReport = async (req, res) => {
             ward: bin.ward,
             priority,
           });
-
-          // Emit to officer's ward room
-          io.to(`ward_${bin.ward}`).emit("new_task_assigned", {
-            message: `📋 New task assigned in ${bin.ward}`,
+          io.to(`city_${bin.city}`).emit("new_task_assigned", {
+            message: `📋 New task assigned at ${bin.location.address}. Your path has been updated!`,
             taskId: task._id,
             priority,
             address: bin.location.address,
           });
         }
-
-       
       }
     }
 
@@ -123,7 +145,14 @@ const createReport = async (req, res) => {
       .populate("citizen", "name email greenPoints")
       .populate("bin", "location city ward area status");
 
-    res.status(201).json(populatedReport);
+    res.status(201).json({
+      ...populatedReport.toObject(),
+      aiAnalysis: {
+        wasteType: aiResult.wasteType,
+        reasoning: aiResult.reasoning,
+        detectedLabels: aiResult.wasteLabels,
+      },
+    });
   } catch (error) {
     console.error("Create report error:", error);
     res.status(500).json({ message: error.message });
@@ -131,8 +160,6 @@ const createReport = async (req, res) => {
 };
 
 // @route  GET /api/reports
-// @access Admin / Officer
-// Supports: ?city=Mumbai&ward=Ward42&priority=critical&status=pending
 const getAllReports = async (req, res) => {
   try {
     const filter = {};
@@ -153,7 +180,6 @@ const getAllReports = async (req, res) => {
 };
 
 // @route  GET /api/reports/my
-// @access Citizen
 const getMyReports = async (req, res) => {
   try {
     const reports = await Report.find({ citizen: req.user._id })
@@ -166,7 +192,6 @@ const getMyReports = async (req, res) => {
 };
 
 // @route  GET /api/reports/:id
-// @access Protected
 const getReportById = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id)
@@ -182,7 +207,6 @@ const getReportById = async (req, res) => {
 };
 
 // @route  PUT /api/reports/:id/status
-// @access Admin / Officer
 const updateReportStatus = async (req, res) => {
   try {
     const { status } = req.body;

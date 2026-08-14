@@ -9,7 +9,7 @@ const generateToken = (id, role) => {
 const registerUser = async (req, res) => {
   try {
     console.log("register hit", req.body);
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, city } = req.body;
 
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -25,6 +25,7 @@ const registerUser = async (req, res) => {
       email,
       password: hashedPassword,
       role,
+      city,
     });
 
     res.status(201).json({
@@ -32,6 +33,7 @@ const registerUser = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      city: user.city,
       greenPoints: user.greenPoints,
       token: generateToken(user._id, user.role),
     });
@@ -60,6 +62,7 @@ const loginUser = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      city: user.city,
       greenPoints: user.greenPoints,
       token: generateToken(user._id, user.role),
     });

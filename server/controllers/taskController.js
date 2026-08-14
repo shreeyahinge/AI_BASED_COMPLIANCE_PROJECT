@@ -1,6 +1,8 @@
 const Task = require("../models/Task");
 const Bin = require("../models/Bin");
 const Report = require("../models/Report");
+const { verifyCleanBin } = require("../services/verificationService");
+const { optimiseRoute } = require("../services/routeService");
 
 // @route  GET /api/tasks
 // @access Admin
@@ -13,7 +15,7 @@ const getAllTasks = async (req, res) => {
     if (req.query.priority) filter.priority = req.query.priority;
 
     const tasks = await Task.find(filter)
-      .populate("report", "photoUrl aiScore priority")
+      .populate("report", "photoUrl aiScore priority location")
       .populate("bin", "location city ward area fillLevel status")
       .populate("assignedTo", "name email phone")
       .populate("assignedBy", "name email")
@@ -25,6 +27,19 @@ const getAllTasks = async (req, res) => {
   }
 };
 
+
+// @route  GET /api/tasks/optimise-route
+// @access Officer
+const getOptimisedRoute = async (req, res) => {
+  try {
+    const route = await optimiseRoute(req.user._id);
+    res.json(route);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
 // @route  GET /api/tasks/my
 // @access Officer
 const getMyTasks = async (req, res) => {
@@ -33,7 +48,7 @@ const getMyTasks = async (req, res) => {
       assignedTo: req.user._id,
       status: { $in: ["pending", "in_progress"] },
     })
-      .populate("report", "photoUrl aiScore priority notes")
+      .populate("report", "photoUrl aiScore priority notes location")
       .populate("bin", "location city ward area fillLevel status")
       .sort({ priority: -1, createdAt: -1 });
 
@@ -89,28 +104,58 @@ const completeTask = async (req, res) => {
       return res.status(403).json({ message: "Not your task" });
     }
 
+    // Run AI verification on after photo
+    console.log("Verifying after photo with Gemini AI...");
+    const verification = await verifyCleanBin(afterPhotoUrl);
+    console.log("Verification result:", verification);
+
+    if (!verification.verified) {
+      return res.status(400).json({
+        message: "Task cannot be closed — AI detected waste still remaining",
+        verification,
+        hint: "Please clean the bin completely and upload a new photo",
+      });
+    }
+
     task.status = "completed";
     task.afterPhotoUrl = afterPhotoUrl;
     task.completedAt = Date.now();
-    task.aiVerified = true; // Will be real AI check in Term 2
+    task.aiVerified = true;
     if (notes) task.notes = notes;
-
     await task.save();
 
-    // Update bin status to clean
+    // Update bin to clean
     await Bin.findByIdAndUpdate(task.bin, {
       status: "clean",
-      fillLevel: 0,
+      fillLevel: verification.remainingWaste || 0,
       lastCleaned: Date.now(),
     });
 
-    // Update report status to resolved
-    await Report.findByIdAndUpdate(task.report, {
-      status: "resolved",
-    });
+    // Resolve the report
+    await Report.findByIdAndUpdate(task.report, { status: "resolved" });
 
-    res.json(task);
+    // Notify admin via Socket.io
+    const io = req.app.get("io");
+    if (io) {
+      io.to("admin_room").emit("task_completed", {
+        message: `✅ Task completed in ${task.city}`,
+        taskId: task._id,
+        aiVerified: true,
+        confidence: verification.confidence,
+      });
+    }
+
+    res.json({
+      task,
+      verification: {
+        isClean: verification.isClean,
+        confidence: verification.confidence,
+        reasoning: verification.reasoning,
+      },
+      message: "Task completed and AI-verified successfully!",
+    });
   } catch (error) {
+    console.error("Complete task error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -133,4 +178,4 @@ const getTaskStats = async (req, res) => {
   }
 };
 
-module.exports = { getAllTasks, getMyTasks, startTask, completeTask, getTaskStats };
+module.exports = { getAllTasks, getMyTasks, startTask, completeTask, getTaskStats,getOptimisedRoute };
