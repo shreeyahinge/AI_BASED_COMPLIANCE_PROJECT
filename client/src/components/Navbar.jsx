@@ -21,11 +21,20 @@ export default function Navbar() {
   return (
     <nav style={styles.nav}>
       <div style={styles.left}>
-        <span style={styles.logo}>🗑️</span>
-        <span style={styles.brand}>SmartBin</span>
+        <span style={styles.logo} onClick={() => navigate(`/${user?.role || "login"}`)}>🗑️</span>
+        <span style={styles.brand} onClick={() => navigate(`/${user?.role || "login"}`)}>SmartBin</span>
         <span style={styles.cityTag}>City Waste Management</span>
       </div>
       <div style={styles.right}>
+        {user?.role === "admin" && (
+          <button
+            onClick={() => navigate("/camera-station")}
+            style={styles.cameraStationBtn}
+            title="Open Live Road CCTV & Phone Camera Surveillance"
+          >
+            📹 Live Road CCTV
+          </button>
+        )}
         <span style={styles.name}>{user?.name}</span>
         <span
           style={{
@@ -102,6 +111,18 @@ const styles = {
     fontSize: "13px",
     color: "#f59e0b",
     fontWeight: "600",
+  },
+  cameraStationBtn: {
+    padding: "7px 14px",
+    background: "#f0fdf4",
+    border: "1px solid #86efac",
+    borderRadius: "8px",
+    color: "#166534",
+    fontSize: "12px",
+    fontWeight: "700",
+    cursor: "pointer",
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+    transition: "all 0.2s",
   },
   logoutBtn: {
     padding: "7px 16px",

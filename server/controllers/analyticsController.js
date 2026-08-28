@@ -53,12 +53,9 @@ const exportPDF = async (req, res) => {
     const city = req.query.city;
     const filter = city ? { city } : {};
 
-    const [overviewData, wardStatsData] = await Promise.all([
+    const [overviewData, wardStatsData, tasksData] = await Promise.all([
       // inline overview calculation
       (async () => {
-        const Bin = require("../models/Bin");
-        const Report = require("../models/Report");
-        const Task = require("../models/Task");
         const [totalBins, criticalBins, totalReports,
           resolvedReports, totalTasks, completedTasks] = await Promise.all([
           Bin.countDocuments({ ...filter, isActive: true }),
@@ -86,9 +83,16 @@ const exportPDF = async (req, res) => {
         }},
         { $sort: { totalReports: -1 } },
       ]),
+      Task.find(filter)
+        .populate("assignedTo", "name email phone city assignedWard")
+        .populate("bin", "binId location ward area")
+        .populate("report", "priority fillLevel")
+        .sort({ createdAt: -1 })
+        .limit(25)
+        .lean(),
     ]);
 
-    generateWardReport({ overview: overviewData, wardStats: wardStatsData }, res);
+    generateWardReport({ overview: overviewData, wardStats: wardStatsData, tasks: tasksData }, res);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

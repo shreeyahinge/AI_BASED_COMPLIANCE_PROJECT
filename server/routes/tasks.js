@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   getAllTasks,
+  assignTask,
   getMyTasks,
   startTask,
   completeTask,
@@ -11,6 +12,7 @@ const {
 const { protect, authorise } = require("../middleware/authMiddleware");
 
 router.get("/", protect, authorise("admin"), getAllTasks);
+router.post("/assign", protect, authorise("admin"), assignTask);
 router.get("/my", protect, authorise("officer"), getMyTasks);
 router.get("/stats", protect, authorise("admin"), getTaskStats);
 router.put("/:id/start", protect, authorise("officer"), startTask);

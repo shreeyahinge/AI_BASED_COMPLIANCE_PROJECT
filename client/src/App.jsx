@@ -6,6 +6,7 @@ import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import CitizenDashboard from "./pages/CitizenDashboard";
 import OfficerDashboard from "./pages/OfficerDashboard";
+import CameraStation from "./pages/CameraStation";
 
 // Protected route wrapper to check for authentication and roles
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -39,6 +40,16 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+
+        {/* Live Road Camera & CCTV Station (Admin Only) */}
+        <Route
+          path="/camera-station"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <CameraStation />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Protected Admin Route */}
         <Route

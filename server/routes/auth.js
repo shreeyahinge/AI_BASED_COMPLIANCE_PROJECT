@@ -4,6 +4,7 @@ const {
   registerUser,
   loginUser,
   getMe,
+  getOfficers,
 } = require("../controllers/authController");
 const { protect } = require("../middleware/authMiddleware");
 const User = require("../models/User");
@@ -11,6 +12,7 @@ const User = require("../models/User");
 router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.get("/me", protect, getMe);
+router.get("/officers", protect, getOfficers);
 
 // Leaderboard
 router.get("/leaderboard", protect, async (req, res) => {

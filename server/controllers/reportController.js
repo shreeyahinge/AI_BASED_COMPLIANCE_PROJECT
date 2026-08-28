@@ -169,11 +169,28 @@ const getAllReports = async (req, res) => {
     if (req.query.status) filter.status = req.query.status;
 
     const reports = await Report.find(filter)
-      .populate("citizen", "name email")
-      .populate("bin", "location city ward area status fillLevel")
-      .sort({ createdAt: -1 });
+      .populate("citizen", "name email phone")
+      .populate("bin", "binId location city ward area status fillLevel")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json(reports);
+    const reportIds = reports.map((r) => r._id);
+    const tasks = await Task.find({ report: { $in: reportIds } })
+      .populate("assignedTo", "name email phone city assignedWard")
+      .populate("assignedBy", "name email")
+      .lean();
+
+    const taskMap = {};
+    tasks.forEach((t) => {
+      taskMap[t.report.toString()] = t;
+    });
+
+    const reportsWithTask = reports.map((r) => ({
+      ...r,
+      task: taskMap[r._id.toString()] || null,
+    }));
+
+    res.json(reportsWithTask);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -183,9 +200,26 @@ const getAllReports = async (req, res) => {
 const getMyReports = async (req, res) => {
   try {
     const reports = await Report.find({ citizen: req.user._id })
-      .populate("bin", "location city ward area status")
-      .sort({ createdAt: -1 });
-    res.json(reports);
+      .populate("bin", "binId location city ward area status")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const reportIds = reports.map((r) => r._id);
+    const tasks = await Task.find({ report: { $in: reportIds } })
+      .populate("assignedTo", "name email phone city assignedWard")
+      .lean();
+
+    const taskMap = {};
+    tasks.forEach((t) => {
+      taskMap[t.report.toString()] = t;
+    });
+
+    const reportsWithTask = reports.map((r) => ({
+      ...r,
+      task: taskMap[r._id.toString()] || null,
+    }));
+
+    res.json(reportsWithTask);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -195,12 +229,19 @@ const getMyReports = async (req, res) => {
 const getReportById = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id)
-      .populate("citizen", "name email")
-      .populate("bin", "location city ward area status fillLevel");
+      .populate("citizen", "name email phone")
+      .populate("bin", "binId location city ward area status fillLevel")
+      .lean();
     if (!report) {
       return res.status(404).json({ message: "Report not found" });
     }
-    res.json(report);
+
+    const task = await Task.findOne({ report: report._id })
+      .populate("assignedTo", "name email phone city assignedWard")
+      .populate("assignedBy", "name email")
+      .lean();
+
+    res.json({ ...report, task: task || null });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

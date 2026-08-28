@@ -12,7 +12,14 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-    const newSocket = io("http://localhost:5000");
+    const getSocketUrl = () => {
+      if (typeof window !== "undefined") {
+        return `http://${window.location.hostname}:5001`;
+      }
+      return "http://localhost:5001";
+    };
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || getSocketUrl();
+    const newSocket = io(socketUrl);
     setSocket(newSocket);
 
     // Join the right room based on role

@@ -3,23 +3,35 @@ const axios = require("axios");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Convert image URL to base64
-const urlToBase64 = async (imageUrl) => {
-  const response = await axios.get(imageUrl, {
-    responseType: "arraybuffer",
-  });
-  const buffer = Buffer.from(response.data);
-  const base64 = buffer.toString("base64");
-  const mimeType = response.headers["content-type"] || "image/jpeg";
-  return { base64, mimeType };
+// Convert image URL or Base64 data URI to Gemini format
+const getImageData = async (imageInput) => {
+  if (typeof imageInput === "string" && imageInput.startsWith("data:")) {
+    const matches = imageInput.match(/^data:([A-Za-z0-9-+\/]+);base64,(.+)$/);
+    if (matches && matches.length === 3) {
+      return { mimeType: matches[1], base64: matches[2] };
+    }
+  }
+
+  if (typeof imageInput === "string" && (imageInput.startsWith("http://") || imageInput.startsWith("https://"))) {
+    const response = await axios.get(imageInput, {
+      responseType: "arraybuffer",
+      timeout: 5000,
+      headers: { "User-Agent": "Mozilla/5.0" }
+    });
+    const buffer = Buffer.from(response.data);
+    const base64 = buffer.toString("base64");
+    const mimeType = response.headers["content-type"] || "image/jpeg";
+    return { base64, mimeType };
+  }
+
+  return { base64: imageInput, mimeType: "image/jpeg" };
 };
 
-const analyseWasteImage = async (imageUrl) => {
+const analyseWasteImage = async (imageInput) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Convert image to base64
-    const { base64, mimeType } = await urlToBase64(imageUrl);
+    const { base64, mimeType } = await getImageData(imageInput);
 
     const prompt = `You are an AI waste detection system for a city waste management platform.
 
@@ -41,10 +53,16 @@ Analyse this image and respond ONLY with a valid JSON object in this exact forma
 - If the image has NO visible waste or bin, set isWaste to false and aiScore below 30
 - Do NOT include any text outside the JSON`;
 
-    const result = await model.generateContent([
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini AI API call timed out after 6s")), 6000)
+    );
+
+    const generatePromise = model.generateContent([
       { inlineData: { data: base64, mimeType } },
       prompt,
     ]);
+
+    const result = await Promise.race([generatePromise, timeoutPromise]);
 
     const responseText = result.response.text();
 

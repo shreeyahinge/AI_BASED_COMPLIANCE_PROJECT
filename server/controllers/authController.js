@@ -76,4 +76,19 @@ const getMe = async (req, res) => {
   res.json(req.user);
 };
 
-module.exports = { registerUser, loginUser, getMe };
+const getOfficers = async (req, res) => {
+  try {
+    const filter = { role: "officer", isActive: true };
+    if (req.query.city) {
+      filter.city = new RegExp(`^${req.query.city}$`, "i");
+    }
+    const officers = await User.find(filter)
+      .select("name email phone city assignedWard assignedZone isActive")
+      .sort({ name: 1 });
+    res.json(officers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { registerUser, loginUser, getMe, getOfficers };

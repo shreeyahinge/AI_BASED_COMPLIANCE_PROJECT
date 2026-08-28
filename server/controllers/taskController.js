@@ -1,6 +1,7 @@
 const Task = require("../models/Task");
 const Bin = require("../models/Bin");
 const Report = require("../models/Report");
+const User = require("../models/User");
 const { verifyCleanBin } = require("../services/verificationService");
 const { optimiseRoute } = require("../services/routeService");
 
@@ -15,14 +16,87 @@ const getAllTasks = async (req, res) => {
     if (req.query.priority) filter.priority = req.query.priority;
 
     const tasks = await Task.find(filter)
-      .populate("report", "photoUrl aiScore priority location")
-      .populate("bin", "location city ward area fillLevel status")
-      .populate("assignedTo", "name email phone")
+      .populate("report", "photoUrl aiScore priority fillLevel notes location createdAt")
+      .populate("bin", "binId location city ward area fillLevel status locationType")
+      .populate("assignedTo", "name email phone city assignedWard")
       .populate("assignedBy", "name email")
       .sort({ createdAt: -1 });
 
     res.json(tasks);
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @route  POST /api/tasks/assign
+// @access Admin
+const assignTask = async (req, res) => {
+  try {
+    const { reportId, officerId, priority, notes } = req.body;
+
+    const report = await Report.findById(reportId).populate("bin");
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+
+    const officer = await User.findById(officerId);
+    if (!officer || officer.role !== "officer") {
+      return res.status(400).json({ message: "Invalid officer selected" });
+    }
+
+    let task = await Task.findOne({ report: reportId });
+
+    if (task) {
+      task.assignedTo = officer._id;
+      task.assignedBy = req.user._id;
+      if (priority) task.priority = priority;
+      if (notes) task.notes = notes;
+      task.status = "pending";
+      await task.save();
+    } else {
+      task = await Task.create({
+        report: report._id,
+        bin: report.bin?._id || report.bin,
+        assignedTo: officer._id,
+        assignedBy: req.user._id,
+        priority: priority || report.priority || "medium",
+        city: report.city || officer.city,
+        ward: report.ward || officer.assignedWard,
+        notes: notes || "",
+      });
+    }
+
+    report.status = "assigned";
+    await report.save();
+
+    const populatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "name email phone city assignedWard")
+      .populate("assignedBy", "name email")
+      .populate("bin", "binId location city ward area fillLevel status locationType")
+      .populate("report", "photoUrl aiScore priority fillLevel notes location createdAt");
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`city_${task.city}`).emit("new_task_assigned", {
+        message: `📋 Task assigned to ${officer.name} at ${report.bin?.location?.address || "specified bin"}`,
+        taskId: task._id,
+        officerId: officer._id,
+        priority: task.priority,
+        address: report.bin?.location?.address,
+      });
+      io.to("admin_room").emit("task_updated", {
+        message: `Task assigned to ${officer.name}`,
+        taskId: task._id,
+        reportId: report._id,
+      });
+    }
+
+    res.json({
+      message: `Task successfully assigned to ${officer.name}`,
+      task: populatedTask,
+    });
+  } catch (error) {
+    console.error("Assign task error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -178,4 +252,12 @@ const getTaskStats = async (req, res) => {
   }
 };
 
-module.exports = { getAllTasks, getMyTasks, startTask, completeTask, getTaskStats,getOptimisedRoute };
+module.exports = {
+  getAllTasks,
+  assignTask,
+  getMyTasks,
+  startTask,
+  completeTask,
+  getTaskStats,
+  getOptimisedRoute,
+};
